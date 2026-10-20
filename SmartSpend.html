@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartSpend Pro - Ultimate Financial Dashboard</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    /* Injected PWA Manifest Dynamic Registration */
+    const manifestData = {
+      name: "SmartSpend Pro - Personal Finance",
+      short_name: "SmartSpend",
+      start_url: "./",
+      display: "standalone",
+      background_color: "#0f172a",
+      theme_color: "#4f46e5",
+      description: "Ultimate offline-capable personal financial dashboard & budget planner.",
+      icons: [
+        {
+          src: "https://cdn-icons-png.flaticon.com/512/2953/2953361.png",
+          sizes: "192x192",
+          type: "image/png"
+        },
+        {
+          src: "https://cdn-icons-png.flaticon.com/512/2953/2953361.png",
+          sizes: "512x512",
+          type: "image/png"
+        }
+      ]
+    };
+
+    const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = manifestURL;
+    document.head.appendChild(manifestLink);
+
+    /* Injected Inline Service Worker Code */
+    const swCode = `
+      const CACHE_NAME = 'smartspend-pro-v1';
+      const ASSETS_TO_CACHE = [
+        './',
+        'https://cdn.tailwindcss.com',
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+        'https://cdn.jsdelivr.net/npm/chart.js'
+      ];
+
+      self.addEventListener('install', (event) => {
+        event.waitUntil(
+          caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(ASSETS_TO_CACHE);
+          })
+        );
+        self.skipWaiting();
+      });
+
+      self.addEventListener('activate', (event) => {
+        event.waitUntil(
+          caches.keys().then((keys) => {
+            return Promise.all(
+              keys.map((key) => {
+                if (key !== CACHE_NAME) {
+                  return caches.delete(key);
+                }
+              })
+            );
+          })
+        );
+        self.clients.claim();
+      });
+
+      self.addEventListener('fetch', (event) => {
+        event.respondWith(
+          caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+              // Return cached asset, fetch fresh in background
+              fetch(event.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                  caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+                }
+              }).catch(() => {/* Offline fallback ignore */});
+              return cachedResponse;
+            }
+            return fetch(event.request).catch(() => {
+              // Offline fallback response if needed
+            });
+          })
+        );
+      });
+    `;
+
+    // Register Service Worker from Blob
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl)
+          .then((reg) => console.log('PWA Service Worker registered:', reg))
+          .catch((err) => console.log('Service Worker registration failed:', err));
+      });
+    }
+  </script>
+
+  <!-- Tailwind Configuration -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.7);
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printableReportArea, #printableReportArea * {
+        visibility: visible;
+      }
+      #printableReportArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200 pb-12">
+
+  <!-- PIN Security Lock Screen Overlay -->
+  <div id="pinLockOverlay" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 dark:border-slate-700 text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-slate-800 dark:text-white">SmartSpend Locked</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Enter your 4-digit PIN to access dashboard</p>
+      </div>
+      <form onsubmit="verifyPin(event)" class="space-y-4">
+        <input type="password" id="pinInput" maxlength="4" placeholder="••••" class="w-32 text-center tracking-widest text-2xl font-bold bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mx-auto"/>
+        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition">Unlock Dashboard</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700/60 transition-colors">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Logo & App Name -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <i class="fa-solid fa-wallet text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight text-slate-800 dark:text-white">SmartSpend Pro</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Financial Hub & Budget Planner</p>
+        </div>
+      </div>
+
+      <!-- Header Controls -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        
+        <!-- Offline / Online Connection Indicator -->
+        <div id="connectionStatusBadge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="connectionStatusText">Online</span>
+        </div>
+
+        <!-- PWA Install App Button -->
+        <button id="pwaInstallBtn" onclick="installPWA()" class="hidden px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-download"></i>
+          <span>Install App</span>
+        </button>
+
+        <!-- Currency Selector -->
+        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-600">
+          <i class="fa-solid fa-coins text-xs text-amber-500"></i>
+          <select id="currencySelect" onchange="changeCurrency(this.value)" class="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer text-slate-700 dark:text-slate-200">
+            <option value="$">USD ($)</option>
+            <option value="₹">INR (₹)</option>
+            <option value="€">EUR (€)</option>
+            <option value="£">GBP (£)</option>
+            <option value="¥">JPY (¥)</option>
+          </select>
+        </div>
+
+        <!-- Print Report -->
+        <button onclick="window.print()" class="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition flex items-center gap-2" title="Print Financial Report">
+          <i class="fa-solid fa-print text-indigo-500"></i>
+          <span class="hidden md:inline">Report</span>
+        </button>
+
+        <!-- Backup & Restore -->
+        <div class="hidden sm:flex items-center gap-1.5">
+          <button onclick="exportFullBackup()" class="p-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Backup All Data (JSON)">
+            <i class="fa-solid fa-database text-emerald-500"></i>
+          </button>
+          
+          <label class="p-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer" title="Restore Data (JSON)">
+            <i class="fa-solid fa-upload text-sky-500"></i>
+            <input type="file" id="jsonBackupInput" accept=".json" class="hidden" onchange="importFullBackup(event)" />
+          </label>
+        </div>
+
+        <!-- PIN Settings -->
+        <button onclick="openPinModal()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" title="Security Settings">
+          <i class="fa-solid fa-shield-halved text-sm text-indigo-500"></i>
+        </button>
+
+        <!-- Dark/Light Theme Toggle -->
+        <button onclick="toggleTheme()" class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition" title="Toggle Theme">
+          <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="printableReportArea" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Smart Financial Insights Banner -->
+    <div id="smartInsightBanner" class="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-200 dark:border-indigo-800/50 p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 dark:text-white">Smart Financial Insights</h3>
+          <p id="smartInsightText" class="text-xs text-slate-600 dark:text-slate-300">Analyzing your financial records...</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 self-end md:self-auto">
+        <button onclick="processDueRecurringTransactions()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrows-rotate"></i> Process Recurring Bills
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary Metrics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total Income Card -->
+      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Income</span>
+          <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <i class="fa-solid fa-arrow-down text-sm"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-slate-800 dark:text-white" id="totalIncome">$0.00</div>
+      </div>
+
+      <!-- Total Expenses Card -->
+      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Expenses</span>
+          <div class="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+            <i class="fa-solid fa-arrow-up text-sm"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-slate-800 dark:text-white" id="totalExpenses">$0.00</div>
+      </div>
+
+      <!-- Net Balance Card -->
+      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Net Balance</span>
+          <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <i class="fa-solid fa-scale-balanced text-sm"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-slate-800 dark:text-white" id="netBalance">$0.00</div>
+      </div>
+
+      <!-- Savings Rate Card -->
+      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Savings Rate</span>
+          <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <i class="fa-solid fa-piggy-bank text-sm"></i>
+          </div>
+        </div>
+        <div class="text-2xl font-bold text-slate-800 dark:text-white" id="savingsRate">0%</div>
+      </div>
+    </div>
+
+    <!-- Payment Accounts Bar -->
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <i class="fa-solid fa-credit-card text-indigo-500"></i> Account Balances
+        </h2>
+        <button onclick="openAccountModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold px-3 py-1.5 rounded-lg transition">
+          + Add Account
+        </button>
+      </div>
+      <div id="accountCardsList" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <!-- Account Cards Rendered Here -->
+      </div>
+    </div>
+
+    <!-- Analytics Charts Split -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Category Doughnut Chart -->
+      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-indigo-500"></i> Expense Breakdown by Category
+        </h3>
+        <div class="relative flex items-center justify-center h-64 w-full">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Income vs Expense Monthly Trend Bar Chart -->
+      <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700/50 shadow-sm">
+        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-chart-column text-indigo-500"></i> Monthly Cashflow Trends
+        </h3>
+        <div class="relative flex items-center justify-center h-64 w-full">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Split Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Left Column: Add Transaction & Category Budget Targets -->
+      <div class="space-y-6">
+        
+        <!-- Add Transaction Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+          <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <i class="fa-solid fa-plus-circle text-indigo-500"></i> Add Transaction
+          </h2>
+
+          <form id="transactionForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+            
+            <!-- Type Selector -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Type</label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="cursor-pointer">
+                  <input type="radio" name="txType" value="expense" checked onchange="updateFormCategoryOptions()" class="peer hidden"/>
+                  <div class="py-2 px-3 text-center rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500 transition">
+                    Expense
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="txType" value="income" onchange="updateFormCategoryOptions()" class="peer hidden"/>
+                  <div class="py-2 px-3 text-center rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition">
+                    Income
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Description</label>
+              <input type="text" id="txDescription" required placeholder="e.g. Supermarket, Rent, Client Payment" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+            </div>
+
+            <!-- Amount & Date Row -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Amount</label>
+                <input type="number" id="txAmount" step="0.01" required placeholder="0.00" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Date</label>
+                <input type="date" id="txDate" required class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+              </div>
+            </div>
+
+            <!-- Category & Account Row -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                <select id="txCategory" required class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2.5 text-xs border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <!-- Dynamic Options -->
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Account</label>
+                <select id="txAccount" required class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2.5 text-xs border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <!-- Dynamic Accounts -->
+                </select>
+              </div>
+            </div>
+
+            <!-- Receipt File Attachment -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Receipt Image (Optional)</label>
+              <input type="file" id="txReceipt" accept="image/*" class="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-600 dark:file:bg-indigo-950/50 dark:file:text-indigo-400 hover:file:bg-indigo-100 cursor-pointer"/>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-semibold rounded-xl text-sm shadow-md shadow-indigo-500/20 transition duration-150">
+              Save Transaction
+            </button>
+          </form>
+        </div>
+
+        <!-- Monthly Budget Targets Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-bullseye text-indigo-500"></i> Monthly Category Budgets
+            </h2>
+            <button onclick="toggleBudgetModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold px-3 py-1.5 rounded-lg transition">
+              + Set Budget
+            </button>
+          </div>
+          <div id="budgetProgressList" class="space-y-3 max-h-56 overflow-y-auto pr-1">
+            <!-- Budget Bars Rendered Here -->
+          </div>
+        </div>
+
+        <!-- Dynamic Category Manager Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-tags text-indigo-500"></i> Category Manager
+            </h2>
+            <button onclick="toggleCustomCategoryModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold px-3 py-1.5 rounded-lg transition">
+              + New Category
+            </button>
+          </div>
+
+          <div id="categoryPillsList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+            <!-- Dynamic Category Pills Rendered Here -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Savings Goals & Transactions Table -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Savings Goals Tracker -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-trophy text-amber-500"></i> Savings Goals
+            </h2>
+            <button onclick="toggleGoalModal()" class="text-xs bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-semibold px-3 py-1.5 rounded-lg transition">
+              + New Goal
+            </button>
+          </div>
+          <div id="savingsGoalsList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Savings Goals Cards Rendered Here -->
+          </div>
+        </div>
+
+        <!-- Recurring Bills Manager -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left text-indigo-500"></i> Recurring Subscriptions & Income
+            </h2>
+            <button onclick="toggleRecurringModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold px-3 py-1.5 rounded-lg transition">
+              + Add Recurring
+            </button>
+          </div>
+          <div id="recurringList" class="divide-y divide-slate-100 dark:divide-slate-700/50 max-h-48 overflow-y-auto">
+            <!-- Recurring items rendered here -->
+          </div>
+        </div>
+
+        <!-- Transaction Table Card with Integrated Filters -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700/50 overflow-hidden">
+          
+          <!-- Table Action & Filter Header -->
+          <div class="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-700/60 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <h2 class="text-lg font-bold text-slate-800 dark:text-white">Transactions History</h2>
+                <span id="transactionCountBadge" class="bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs px-2.5 py-1 rounded-full font-semibold">0</span>
+              </div>
+              
+              <!-- Bulk Action Bar -->
+              <div id="bulkActionBar" class="hidden items-center gap-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 px-3 py-1.5 rounded-xl">
+                <span id="selectedCountText" class="text-xs font-semibold text-rose-700 dark:text-rose-400">0 selected</span>
+                <button onclick="confirmBulkDelete()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1 rounded-lg transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-trash-can"></i> Delete Selected
+                </button>
+              </div>
+
+              <!-- Export CSV Button -->
+              <button onclick="exportToCSV()" class="p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition flex items-center gap-2">
+                <i class="fa-solid fa-file-csv text-indigo-500"></i> Export CSV
+              </button>
+            </div>
+
+            <!-- Integrated Filter Controls Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="renderApp()" placeholder="Search description..." class="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl text-xs border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+
+              <div>
+                <select id="filterCategory" onchange="renderApp()" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-xs border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">All Categories</option>
+                </select>
+              </div>
+
+              <div>
+                <select id="filterType" onchange="renderApp()" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-xs border border-slate-200 dark:border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">All Types</option>
+                  <option value="expense">Expenses Only</option>
+                  <option value="income">Income Only</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr class="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-100 dark:border-slate-700/60">
+                  <th class="py-3 px-4 w-10 text-center">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                  </th>
+                  <th class="py-3 px-4">Description</th>
+                  <th class="py-3 px-4">Category & Account</th>
+                  <th class="py-3 px-4">Date</th>
+                  <th class="py-3 px-4 text-right">Amount</th>
+                  <th class="py-3 px-4 text-center">Receipt</th>
+                  <th class="py-3 px-4 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="transactionTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/40">
+                <!-- Dynamic Rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+
+  <!-- Custom Category Modal -->
+  <div id="customCategoryModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Create Custom Category</h3>
+        <button onclick="toggleCustomCategoryModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <form id="customCategoryForm" onsubmit="handleCreateCategory(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Category Type</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="customCatType" value="expense" checked class="peer hidden"/>
+              <div class="py-2 px-3 text-center rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500 transition">
+                Expense Category
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="customCatType" value="income" class="peer hidden"/>
+              <div class="py-2 px-3 text-center rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 peer-checked:bg-emerald-500 peer-checked:text-white peer-checked:border-emerald-500 transition">
+                Income Category
+              </div>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Category Name</label>
+          <input type="text" id="customCatName" required placeholder="e.g. Pet Care, Freelancing" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Color Badge</label>
+          <input type="color" id="customCatColor" value="#6366f1" class="h-10 w-full bg-transparent border-0 rounded cursor-pointer">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="toggleCustomCategoryModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Budget Target Modal -->
+  <div id="budgetModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Set Monthly Budget</h3>
+        <button onclick="toggleBudgetModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSaveBudget(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Expense Category</label>
+          <select id="budgetCategorySelect" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Monthly Limit Amount</label>
+          <input type="number" id="budgetAmountInput" step="0.01" required placeholder="500.00" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="toggleBudgetModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition">Save Budget Target</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Savings Goal Modal -->
+  <div id="goalModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Create Savings Goal</h3>
+        <button onclick="toggleGoalModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSaveGoal(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Goal Name</label>
+          <input type="text" id="goalNameInput" required placeholder="e.g. Emergency Fund, Vacation" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Target Amount</label>
+          <input type="number" id="goalTargetInput" step="0.01" required placeholder="2000.00" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Current Saved Amount</label>
+          <input type="number" id="goalCurrentInput" step="0.01" value="0" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2.5 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="toggleGoalModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition">Save Goal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Deposit Goal Modal -->
+  <div id="depositGoalModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-xs w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <h3 class="text-base font-bold text-slate-800 dark:text-white">Deposit to Goal</h3>
+      <input type="hidden" id="depositGoalId"/>
+      <input type="number" id="depositAmountInput" step="0.01" placeholder="Amount" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 text-sm border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="toggleDepositModal()" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+        <button type="button" onclick="handleGoalDeposit()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white">Deposit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recurring Modal -->
+  <div id="recurringModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Add Recurring Transaction</h3>
+        <button onclick="toggleRecurringModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSaveRecurring(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description</label>
+          <input type="text" id="recDesc" required placeholder="e.g. Netflix Subscription" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 text-sm border border-slate-200 dark:border-slate-700">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Amount</label>
+            <input type="number" id="recAmount" step="0.01" required placeholder="15.99" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 text-sm border border-slate-200 dark:border-slate-700">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Type</label>
+            <select id="recType" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-xs border border-slate-200 dark:border-slate-700">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Frequency</label>
+            <select id="recFrequency" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-xs border border-slate-200 dark:border-slate-700">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+            <select id="recCategory" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-xs border border-slate-200 dark:border-slate-700"></select>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="toggleRecurringModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white">Save Recurring Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Account Modal -->
+  <div id="accountModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="accountModalTitle" class="text-lg font-bold text-slate-800 dark:text-white">Add Payment Account</h3>
+        <button onclick="toggleAccountModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSaveAccount(event)" class="space-y-4">
+        <input type="hidden" id="accEditId" value=""/>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Account Name</label>
+          <input type="text" id="accNameInput" required placeholder="e.g. Chase Visa, Main Savings" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 text-sm border border-slate-200 dark:border-slate-700">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Initial Starting Balance</label>
+          <input type="number" id="accBalanceInput" step="0.01" required placeholder="1000.00" class="w-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 text-sm border border-slate-200 dark:border-slate-700">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="toggleAccountModal()" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white">Save Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PIN Modal Setup -->
+  <div id="pinSettingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 dark:border-slate-700 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-800 dark:text-white">Dashboard Security PIN</h3>
+        <button onclick="closePinModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="handleSavePin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">New 4-Digit PIN (Leave blank to remove)</label>
+          <input type="password" id="newPinInput" maxlength="4" placeholder="••••" class="w-full text-center text-lg tracking-widest font-bold bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-xl px-3.5 py-2 border border-slate-200 dark:border-slate-700">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closePinModal()" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+          <button type="submit" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white">Save Security PIN</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Receipt Viewer Modal -->
+  <div id="receiptViewerModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4" onclick="toggleReceiptModal(null)">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-4 shadow-2xl relative" onclick="event.stopPropagation()">
+      <button onclick="toggleReceiptModal(null)" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><i class="fa-solid fa-xmark text-lg"></i></button>
+      <h3 class="text-sm font-bold text-slate-800 dark:text-white mb-3">Receipt Image Preview</h3>
+      <img id="receiptModalImage" src="" alt="Receipt" class="w-full max-h-[70vh] object-contain rounded-xl border border-slate-200 dark:border-slate-700"/>
+    </div>
+  </div>
+
+  <script>
+    // Initial Seed Data
+    const DEFAULT_CATEGORIES = [
+      { id: 'income', name: 'Income / Salary', color: '#10b981', type: 'income' },
+      { id: 'home', name: 'Home', color: '#6366f1', type: 'expense' },
+      { id: 'rent', name: 'Rent', color: '#8b5cf6', type: 'expense' },
+      { id: 'investment', name: 'Investment', color: '#0EA5E9', type: 'expense' },
+      { id: 'utilities', name: 'Utilities', color: '#f59e0b', type: 'expense' },
+      { id: 'subscriptions', name: 'Subscriptions', color: '#ec4899', type: 'expense' },
+      { id: 'entertainment', name: 'Entertainment', color: '#a855f7', type: 'expense' },
+      { id: 'healthcare', name: 'Healthcare', color: '#ef4444', type: 'expense' },
+      { id: 'dining', name: 'Dining', color: '#f97316', type: 'expense' },
+      { id: 'transportation', name: 'Transportation', color: '#14b8a6', type: 'expense' },
+      { id: 'groceries', name: 'Groceries', color: '#84cc16', type: 'expense' },
+      { id: 'shopping', name: 'Shopping', color: '#3b82f6', type: 'expense' }
+    ];
+
+    const DEFAULT_ACCOUNTS = [
+      { id: 'main_bank', name: 'Main Bank Account', initialBalance: 3500 },
+      { id: 'credit_card', name: 'Credit Card', initialBalance: 0 },
+      { id: 'cash', name: 'Cash Wallet', initialBalance: 200 }
+    ];
+
+    const SAMPLE_TRANSACTIONS = [
+      { id: '1', description: 'Monthly Salary', amount: 4500, type: 'income', category: 'Income / Salary', account: 'Main Bank Account', date: '2026-10-01', receipt: null },
+      { id: '2', description: 'Apartment Rent', amount: 1200, type: 'expense', category: 'Rent', account: 'Main Bank Account', date: '2026-10-02', receipt: null },
+      { id: '3', description: 'Supermarket Groceries', amount: 185.50, type: 'expense', category: 'Groceries', account: 'Credit Card', date: '2026-10-05', receipt: null },
+      { id: '4', description: 'Index Fund Investment', amount: 500, type: 'expense', category: 'Investment', account: 'Main Bank Account', date: '2026-10-10', receipt: null }
+    ];
+
+    const DEFAULT_BUDGETS = {
+      'Groceries': 400,
+      'Dining': 200,
+      'Rent': 1200,
+      'Entertainment': 150
+    };
+
+    const DEFAULT_GOALS = [
+      { id: 'g1', name: 'Emergency Fund', target: 5000, current: 2400 },
+      { id: 'g2', name: 'Vacation Trip', target: 1500, current: 850 }
+    ];
+
+    const DEFAULT_RECURRING = [
+      { id: 'r1', description: 'Netflix Subscription', amount: 15.99, type: 'expense', category: 'Subscriptions', frequency: 'monthly', lastProcessed: '2026-09-01' }
+    ];
+
+    // State Variables
+    let categories = JSON.parse(localStorage.getItem('et_categories')) || DEFAULT_CATEGORIES;
+    let transactions = JSON.parse(localStorage.getItem('et_transactions')) || SAMPLE_TRANSACTIONS;
+    let accounts = JSON.parse(localStorage.getItem('et_accounts')) || DEFAULT_ACCOUNTS;
+    let budgets = JSON.parse(localStorage.getItem('et_budgets')) || DEFAULT_BUDGETS;
+    let goals = JSON.parse(localStorage.getItem('et_goals')) || DEFAULT_GOALS;
+    let recurring = JSON.parse(localStorage.getItem('et_recurring')) || DEFAULT_RECURRING;
+    let securityPin = localStorage.getItem('et_pin') || '';
+    let currentCurrency = localStorage.getItem('et_currency') || '$';
+    let selectedTransactionIds = new Set();
+    let categoryChartInstance = null;
+    let trendChartInstance = null;
+
+    function saveAllState() {
+      localStorage.setItem('et_categories', JSON.stringify(categories));
+      localStorage.setItem('et_transactions', JSON.stringify(transactions));
+      localStorage.setItem('et_accounts', JSON.stringify(accounts));
+      localStorage.setItem('et_budgets', JSON.stringify(budgets));
+      localStorage.setItem('et_goals', JSON.stringify(goals));
+      localStorage.setItem('et_recurring', JSON.stringify(recurring));
+    }
+
+    // Theme Switcher
+    function initTheme() {
+      const isDark = localStorage.getItem('et_theme') === 'dark' || 
+        (!('et_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.className = 'fa-solid fa-sun text-amber-400';
+      } else {
+        document.documentElement.classList.remove('dark');
+        const icon = document.getElementById('themeIcon');
+        if (icon) icon.className = 'fa-solid fa-moon text-slate-600';
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('et_theme', isDark ? 'dark' : 'light');
+      const icon = document.getElementById('themeIcon');
+      if (icon) icon.className = isDark ? 'fa-solid fa-sun text-amber-400' : 'fa-solid fa-moon text-slate-600';
+      renderCharts();
+    }
+
+    function changeCurrency(val) {
+      currentCurrency = val;
+      localStorage.setItem('et_currency', val);
+      renderApp();
+    }
+
+    // PIN Lock Engine
+    function checkPinLock() {
+      if (securityPin && securityPin.length === 4) {
+        document.getElementById('pinLockOverlay').classList.remove('hidden');
+      } else {
+        document.getElementById('pinLockOverlay').classList.add('hidden');
+      }
+    }
+
+    function verifyPin(e) {
+      e.preventDefault();
+      const pin = document.getElementById('pinInput').value;
+      if (pin === securityPin) {
+        document.getElementById('pinLockOverlay').classList.add('hidden');
+        document.getElementById('pinInput').value = '';
+      } else {
+        alert('Invalid PIN Code');
+      }
+    }
+
+    function openPinModal() {
+      document.getElementById('pinSettingsModal').classList.remove('hidden');
+    }
+    function closePinModal() {
+      document.getElementById('pinSettingsModal').classList.add('hidden');
+    }
+    function handleSavePin(e) {
+      e.preventDefault();
+      const pin = document.getElementById('newPinInput').value.trim();
+      if (pin && pin.length !== 4) {
+        alert('PIN must be 4 digits');
+        return;
+      }
+      securityPin = pin;
+      localStorage.setItem('et_pin', securityPin);
+      closePinModal();
+      alert(pin ? 'Security PIN Enabled' : 'Security PIN Removed');
+    }
+
+    // Modal Toggles
+    function toggleCustomCategoryModal() { document.getElementById('customCategoryModal').classList.toggle('hidden'); }
+    function toggleBudgetModal() { document.getElementById('budgetModal').classList.toggle('hidden'); }
+    function toggleGoalModal() { document.getElementById('goalModal').classList.toggle('hidden'); }
+    function toggleDepositModal() { document.getElementById('depositGoalModal').classList.toggle('hidden'); }
+    function toggleRecurringModal() { document.getElementById('recurringModal').classList.toggle('hidden'); }
+    function toggleReceiptModal(imgUrl) {
+      const modal = document.getElementById('receiptViewerModal');
+      const img = document.getElementById('receiptModalImage');
+      if (imgUrl) {
+        img.src = imgUrl;
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function handleCreateCategory(e) {
+      e.preventDefault();
+      const name = document.getElementById('customCatName').value.trim();
+      const color = document.getElementById('customCatColor').value;
+      const type = document.querySelector('input[name="customCatType"]:checked')?.value || 'expense';
+
+      if (!name) return;
+      const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+      categories.push({ id, name, color, type, custom: true });
+      saveAllState();
+      document.getElementById('customCatName').value = '';
+      toggleCustomCategoryModal();
+      renderApp();
+    }
+
+    function deleteCustomCategory(catId) {
+      categories = categories.filter(c => c.id !== catId);
+      saveAllState();
+      renderApp();
+    }
+
+    function handleSaveBudget(e) {
+      e.preventDefault();
+      const cat = document.getElementById('budgetCategorySelect').value;
+      const amount = parseFloat(document.getElementById('budgetAmountInput').value);
+      if (cat && !isNaN(amount)) {
+        budgets[cat] = amount;
+        saveAllState();
+        toggleBudgetModal();
+        renderApp();
+      }
+    }
+
+    function deleteBudget(cat) {
+      delete budgets[cat];
+      saveAllState();
+      renderApp();
+    }
+
+    function handleSaveGoal(e) {
+      e.preventDefault();
+      const name = document.getElementById('goalNameInput').value.trim();
+      const target = parseFloat(document.getElementById('goalTargetInput').value);
+      const current = parseFloat(document.getElementById('goalCurrentInput').value) || 0;
+
+      if (name && !isNaN(target)) {
+        goals.push({ id: 'g_' + Date.now(), name, target, current });
+        saveAllState();
+        toggleGoalModal();
+        renderApp();
+      }
+    }
+
+    function openDepositModal(goalId) {
+      document.getElementById('depositGoalId').value = goalId;
+      document.getElementById('depositAmountInput').value = '';
+      toggleDepositModal();
+    }
+
+    function handleGoalDeposit() {
+      const goalId = document.getElementById('depositGoalId').value;
+      const amount = parseFloat(document.getElementById('depositAmountInput').value);
+      if (goalId && !isNaN(amount) && amount > 0) {
+        const goal = goals.find(g => g.id === goalId);
+        if (goal) {
+          goal.current += amount;
+          saveAllState();
+          toggleDepositModal();
+          renderApp();
+        }
+      }
+    }
+
+    function deleteGoal(goalId) {
+      goals = goals.filter(g => g.id !== goalId);
+      saveAllState();
+      renderApp();
+    }
+
+    function openAccountModal(accId = null) {
+      const modal = document.getElementById('accountModal');
+      const title = document.getElementById('accountModalTitle');
+      const editIdInput = document.getElementById('accEditId');
+      const nameInput = document.getElementById('accNameInput');
+      const balanceInput = document.getElementById('accBalanceInput');
+
+      if (accId) {
+        const acc = accounts.find(a => a.id === accId);
+        if (acc) {
+          title.innerText = 'Edit Payment Account';
+          editIdInput.value = acc.id;
+          nameInput.value = acc.name;
+          balanceInput.value = acc.initialBalance;
+        }
+      } else {
+        title.innerText = 'Add Payment Account';
+        editIdInput.value = '';
+        nameInput.value = '';
+        balanceInput.value = '';
+      }
+      modal.classList.remove('hidden');
+    }
+
+    function toggleAccountModal() {
+      document.getElementById('accountModal').classList.add('hidden');
+    }
+
+    function deleteAccount(accId) {
+      if (accounts.length <= 1) {
+        alert('You must have at least one active account.');
+        return;
+      }
+      accounts = accounts.filter(a => a.id !== accId);
+      saveAllState();
+      renderApp();
+    }
+
+    function handleSaveAccount(e) {
+      e.preventDefault();
+      const id = document.getElementById('accEditId').value;
+      const name = document.getElementById('accNameInput').value.trim();
+      const balance = parseFloat(document.getElementById('accBalanceInput').value);
+
+      if (name && !isNaN(balance)) {
+        if (id) {
+          const acc = accounts.find(a => a.id === id);
+          if (acc) {
+            if (acc.name !== name) {
+              transactions.forEach(t => {
+                if (t.account === acc.name) t.account = name;
+              });
+            }
+            acc.name = name;
+            acc.initialBalance = balance;
+          }
+        } else {
+          accounts.push({ id: 'acc_' + Date.now(), name, initialBalance: balance });
+        }
+        saveAllState();
+        toggleAccountModal();
+        renderApp();
+      }
+    }
+
+    function handleSaveRecurring(e) {
+      e.preventDefault();
+      const description = document.getElementById('recDesc').value.trim();
+      const amount = parseFloat(document.getElementById('recAmount').value);
+      const type = document.getElementById('recType').value;
+      const frequency = document.getElementById('recFrequency').value;
+      const category = document.getElementById('recCategory').value;
+
+      if (description && !isNaN(amount)) {
+        recurring.push({
+          id: 'rec_' + Date.now(),
+          description,
+          amount,
+          type,
+          frequency,
+          category,
+          lastProcessed: null
+        });
+        saveAllState();
+        toggleRecurringModal();
+        renderApp();
+      }
+    }
+
+    function deleteRecurring(recId) {
+      recurring = recurring.filter(r => r.id !== recId);
+      saveAllState();
+      renderApp();
+    }
+
+    function processDueRecurringTransactions() {
+      const today = new Date().toISOString().split('T')[0];
+      let processedCount = 0;
+
+      recurring.forEach(r => {
+        if (r.lastProcessed !== today) {
+          transactions.unshift({
+            id: 'tx_rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            description: `[Recurring] ${r.description}`,
+            amount: r.amount,
+            type: r.type,
+            category: r.category,
+            account: accounts[0]?.name || 'Main Bank Account',
+            date: today,
+            receipt: null
+          });
+          r.lastProcessed = today;
+          processedCount++;
+        }
+      });
+
+      if (processedCount > 0) {
+        saveAllState();
+        renderApp();
+        alert(`Successfully logged ${processedCount} recurring transaction(s).`);
+      } else {
+        alert('All recurring bills are already up to date for today!');
+      }
+    }
+
+    function populateDropdowns() {
+      const txCat = document.getElementById('txCategory');
+      const filterCat = document.getElementById('filterCategory');
+      const budgetCat = document.getElementById('budgetCategorySelect');
+      const recCat = document.getElementById('recCategory');
+      const txAcc = document.getElementById('txAccount');
+
+      const selectedType = document.querySelector('input[name="txType"]:checked')?.value || 'expense';
+      const filteredCategories = categories.filter(c => selectedType === 'income' ? c.type === 'income' : c.type !== 'income');
+
+      if (txCat) txCat.innerHTML = filteredCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      if (filterCat) filterCat.innerHTML = `<option value="ALL">All Categories</option>` + categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      if (budgetCat) budgetCat.innerHTML = categories.filter(c => c.type !== 'income').map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      if (recCat) recCat.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+      if (txAcc) txAcc.innerHTML = accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+    }
+
+    function updateFormCategoryOptions() {
+      populateDropdowns();
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const type = document.querySelector('input[name="txType"]:checked').value;
+      const description = document.getElementById('txDescription').value.trim();
+      const amount = parseFloat(document.getElementById('txAmount').value);
+      const date = document.getElementById('txDate').value;
+      const category = document.getElementById('txCategory').value;
+      const account = document.getElementById('txAccount').value;
+      const receiptFile = document.getElementById('txReceipt').files[0];
+
+      if (!description || isNaN(amount) || !date || !category) return;
+
+      const saveTx = (receiptBase64 = null) => {
+        const newTx = {
+          id: Date.now().toString(),
+          description,
+          amount,
+          type,
+          category,
+          account,
+          date,
+          receipt: receiptBase64
+        };
+
+        transactions.unshift(newTx);
+        saveAllState();
+
+        document.getElementById('txDescription').value = '';
+        document.getElementById('txAmount').value = '';
+        document.getElementById('txReceipt').value = '';
+        renderApp();
+      };
+
+      if (receiptFile) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          saveTx(evt.target.result);
+        };
+        reader.readAsDataURL(receiptFile);
+      } else {
+        saveTx(null);
+      }
+    }
+
+    function getFilteredTransactions() {
+      const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+      const catFilter = document.getElementById('filterCategory')?.value || 'ALL';
+      const typeFilter = document.getElementById('filterType')?.value || 'ALL';
+
+      return transactions.filter(t => {
+        const matchesSearch = t.description.toLowerCase().includes(search);
+        const matchesCat = catFilter === 'ALL' || t.category === catFilter;
+        const matchesType = typeFilter === 'ALL' || t.type === typeFilter;
+        return matchesSearch && matchesCat && matchesType;
+      });
+    }
+
+    function toggleSelectAll(isChecked) {
+      const filtered = getFilteredTransactions();
+      if (isChecked) filtered.forEach(t => selectedTransactionIds.add(t.id));
+      else selectedTransactionIds.clear();
+      renderTable();
+      updateBulkActionBar();
+    }
+
+    function toggleSelectRow(id, isChecked) {
+      if (isChecked) selectedTransactionIds.add(id);
+      else selectedTransactionIds.delete(id);
+      updateBulkActionBar();
+    }
+
+    function updateBulkActionBar() {
+      const bar = document.getElementById('bulkActionBar');
+      const countText = document.getElementById('selectedCountText');
+
+      if (selectedTransactionIds.size > 0) {
+        bar.classList.remove('hidden');
+        bar.classList.add('flex');
+        countText.innerText = `${selectedTransactionIds.size} selected`;
+      } else {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+      }
+    }
+
+    function confirmBulkDelete() {
+      if (confirm(`Delete ${selectedTransactionIds.size} selected transaction(s)?`)) {
+        transactions = transactions.filter(t => !selectedTransactionIds.has(t.id));
+        selectedTransactionIds.clear();
+        saveAllState();
+        renderApp();
+      }
+    }
+
+    function deleteSingleTransaction(id) {
+      transactions = transactions.filter(t => t.id !== id);
+      selectedTransactionIds.delete(id);
+      saveAllState();
+      renderApp();
+    }
+
+    function renderAccountBalances() {
+      const container = document.getElementById('accountCardsList');
+      container.innerHTML = accounts.map(a => {
+        let accBalance = a.initialBalance;
+        transactions.forEach(t => {
+          if (t.account === a.name) {
+            if (t.type === 'income') accBalance += t.amount;
+            else accBalance -= t.amount;
+          }
+        });
+
+        return `
+          <div class="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-700/60 relative group">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">${a.name}</span>
+              <div class="flex items-center gap-1.5 opacity-80 sm:opacity-0 group-hover:opacity-100 transition">
+                <button onclick="openAccountModal('${a.id}')" class="text-slate-400 hover:text-indigo-500 text-xs" title="Edit Account">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button onclick="deleteAccount('${a.id}')" class="text-slate-400 hover:text-rose-500 text-xs" title="Delete Account">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+            <div class="text-lg font-bold ${accBalance >= 0 ? 'text-slate-800 dark:text-white' : 'text-rose-600'}">
+              ${currentCurrency}${accBalance.toFixed(2)}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderBudgets() {
+      const container = document.getElementById('budgetProgressList');
+      const catTotals = {};
+
+      transactions.filter(t => t.type === 'expense').forEach(t => {
+        catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+      });
+
+      const budgetKeys = Object.keys(budgets);
+      if (budgetKeys.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400">No monthly budgets set yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = budgetKeys.map(cat => {
+        const spent = catTotals[cat] || 0;
+        const limit = budgets[cat];
+        const pct = Math.min(100, Math.round((spent / limit) * 100));
+        let colorClass = 'bg-emerald-500';
+        let statusBadge = '<span class="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded">Safe</span>';
+
+        if (pct >= 100) {
+          colorClass = 'bg-rose-500';
+          statusBadge = '<span class="text-[10px] text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/50 px-1.5 py-0.5 rounded">Over Limit</span>';
+        } else if (pct >= 80) {
+          colorClass = 'bg-amber-500';
+          statusBadge = '<span class="text-[10px] text-amber-600 font-bold bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded">Warning</span>';
+        }
+
+        return `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700 dark:text-slate-200">${cat}</span>
+              <div class="flex items-center gap-2">
+                ${statusBadge}
+                <span class="text-slate-500">${currentCurrency}${spent.toFixed(0)} / ${currentCurrency}${limit}</span>
+                <button onclick="deleteBudget('${cat}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+            <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+              <div class="${colorClass} h-full transition-all duration-300" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSavingsGoals() {
+      const container = document.getElementById('savingsGoalsList');
+      if (goals.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 col-span-2">No savings goals created yet.</p>`;
+        return;
+      }
+
+      container.innerHTML = goals.map(g => {
+        const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+        return `
+          <div class="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-100 dark:border-slate-700/60 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-bold text-slate-800 dark:text-white">${g.name}</span>
+              <button onclick="deleteGoal('${g.id}')" class="text-slate-400 hover:text-rose-500 text-xs"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>Progress: ${pct}%</span>
+              <span>${currentCurrency}${g.current.toFixed(0)} / ${currentCurrency}${g.target}</span>
+            </div>
+            <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+              <div class="bg-amber-500 h-full" style="width: ${pct}%"></div>
+            </div>
+            <button onclick="openDepositModal('${g.id}')" class="w-full py-1.5 mt-1 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-semibold hover:bg-amber-100 transition">
+              + Deposit
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRecurring() {
+      const container = document.getElementById('recurringList');
+      if (recurring.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 py-3">No recurring payments configured.</p>`;
+        return;
+      }
+
+      container.innerHTML = recurring.map(r => `
+        <div class="py-2.5 flex items-center justify-between text-xs">
+          <div>
+            <div class="font-semibold text-slate-800 dark:text-slate-100">${r.description}</div>
+            <div class="text-slate-400 text-[10px]">${r.frequency} • ${r.category}</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="font-bold ${r.type === 'expense' ? 'text-rose-600' : 'text-emerald-600'}">
+              ${r.type === 'expense' ? '-' : '+'}${currentCurrency}${r.amount.toFixed(2)}
+            </span>
+            <button onclick="deleteRecurring('${r.id}')" class="text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderCategoryPills() {
+      const container = document.getElementById('categoryPillsList');
+      container.innerHTML = categories.map(c => `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700/70 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <span class="w-2 h-2 rounded-full" style="background-color: ${c.color}"></span>
+          <span>${c.name}</span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded font-semibold ${c.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">${c.type}</span>
+          ${c.custom ? `<button onclick="deleteCustomCategory('${c.id}')" class="ml-1 text-slate-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>` : ''}
+        </span>
+      `).join('');
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('transactionTableBody');
+      const filtered = getFilteredTransactions();
+
+      const countBadge = document.getElementById('transactionCountBadge');
+      if (countBadge) countBadge.innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-8 text-center text-slate-400 text-xs">
+              No transactions found.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(t => {
+        const catObj = categories.find(c => c.name === t.category) || { color: '#64748b' };
+        const isChecked = selectedTransactionIds.has(t.id);
+        const isExpense = t.type === 'expense';
+
+        return `
+          <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-700/20 transition">
+            <td class="py-3 px-4 text-center">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectRow('${t.id}', this.checked)" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-800 dark:text-slate-100">${t.description}</td>
+            <td class="py-3 px-4">
+              <div class="flex flex-col gap-0.5">
+                <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                  <span class="w-2 h-2 rounded-full" style="background-color: ${catObj.color}"></span>
+                  ${t.category}
+                </span>
+                <span class="text-[10px] text-slate-400">${t.account || 'Main Account'}</span>
+              </div>
+            </td>
+            <td class="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">${t.date}</td>
+            <td class="py-3 px-4 text-right font-bold ${isExpense ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">
+              ${isExpense ? '-' : '+'}${currentCurrency}${t.amount.toFixed(2)}
+            </td>
+            <td class="py-3 px-4 text-center">
+              ${t.receipt ? `<button onclick="toggleReceiptModal('${t.receipt}')" class="text-indigo-500 hover:text-indigo-700"><i class="fa-solid fa-receipt"></i></button>` : `<span class="text-slate-300 dark:text-slate-600">-</span>`}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <button onclick="deleteSingleTransaction('${t.id}')" class="text-slate-400 hover:text-rose-600 transition p-1" title="Delete">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderSummaryMetrics() {
+      let income = 0;
+      let expenses = 0;
+
+      transactions.forEach(t => {
+        if (t.type === 'income') income += t.amount;
+        else expenses += t.amount;
+      });
+
+      const net = income - expenses;
+      const rate = income > 0 ? Math.max(0, Math.round(((income - expenses) / income) * 100)) : 0;
+
+      document.getElementById('totalIncome').innerText = `${currentCurrency}${income.toFixed(2)}`;
+      document.getElementById('totalExpenses').innerText = `${currentCurrency}${expenses.toFixed(2)}`;
+      document.getElementById('netBalance').innerText = `${currentCurrency}${net.toFixed(2)}`;
+      document.getElementById('savingsRate').innerText = `${rate}%`;
+    }
+
+    function renderCharts() {
+      const ctxCat = document.getElementById('categoryChart').getContext('2d');
+      const expensesOnly = transactions.filter(t => t.type === 'expense');
+      const catTotals = {};
+
+      expensesOnly.forEach(t => { catTotals[t.category] = (catTotals[t.category] || 0) + t.amount; });
+      const catLabels = Object.keys(catTotals);
+      const catData = Object.values(catTotals);
+      const catColors = catLabels.map(lbl => (categories.find(c => c.name === lbl) || {}).color || '#6366f1');
+
+      if (categoryChartInstance) categoryChartInstance.destroy();
+      categoryChartInstance = new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+          labels: catLabels.length ? catLabels : ['No Expenses'],
+          datasets: [{ data: catData.length ? catData : [1], backgroundColor: catColors.length ? catColors : ['#e2e8f0'], borderWidth: 0 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' } } }
+        }
+      });
+
+      const ctxTrend = document.getElementById('trendChart').getContext('2d');
+      const months = {};
+      
+      transactions.forEach(t => {
+        const mKey = t.date.substr(0, 7);
+        if (!months[mKey]) months[mKey] = { income: 0, expense: 0 };
+        if (t.type === 'income') months[mKey].income += t.amount;
+        else months[mKey].expense += t.amount;
+      });
+
+      const sortedMonths = Object.keys(months).sort().slice(-6);
+      const incomeData = sortedMonths.map(m => months[m].income);
+      const expenseData = sortedMonths.map(m => months[m].expense);
+
+      if (trendChartInstance) trendChartInstance.destroy();
+      trendChartInstance = new Chart(ctxTrend, {
+        type: 'bar',
+        data: {
+          labels: sortedMonths.length ? sortedMonths : ['Current'],
+          datasets: [
+            { label: 'Income', data: incomeData.length ? incomeData : [0], backgroundColor: '#10b981', borderRadius: 6 },
+            { label: 'Expense', data: expenseData.length ? expenseData : [0], backgroundColor: '#f43f5e', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569' } } }
+        }
+      });
+    }
+
+    function renderInsights() {
+      const text = document.getElementById('smartInsightText');
+      const expenses = transactions.filter(t => t.type === 'expense');
+
+      if (expenses.length === 0) {
+        text.innerText = "No expenses logged yet. Add your first transaction to unlock smart insights!";
+        return;
+      }
+
+      const catTotals = {};
+      let totalExp = 0;
+      expenses.forEach(t => {
+        catTotals[t.category] = (catTotals[t.category] || 0) + t.amount;
+        totalExp += t.amount;
+      });
+
+      let topCat = '';
+      let maxVal = 0;
+      for (const c in catTotals) {
+        if (catTotals[c] > maxVal) {
+          maxVal = catTotals[c];
+          topCat = c;
+        }
+      }
+
+      const topPct = Math.round((maxVal / totalExp) * 100);
+      text.innerText = `Your highest spending category is ${topCat}, accounting for ${topPct}% (${currentCurrency}${maxVal.toFixed(2)}) of total expenses.`;
+    }
+
+    function exportToCSV() {
+      if (transactions.length === 0) {
+        alert('No transactions to export.');
+        return;
+      }
+      const headers = ['ID', 'Description', 'Amount', 'Type', 'Category', 'Account', 'Date'];
+      const rows = transactions.map(t => [
+        t.id,
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.amount,
+        t.type,
+        `"${t.category.replace(/"/g, '""')}"`,
+        `"${(t.account || 'Main').replace(/"/g, '""')}"`,
+        t.date
+      ]);
+
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `transactions_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function exportFullBackup() {
+      const state = { categories, transactions, accounts, budgets, goals, recurring };
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `smartspend_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importFullBackup(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (data.transactions && data.categories) {
+            categories = data.categories;
+            transactions = data.transactions;
+            accounts = data.accounts || DEFAULT_ACCOUNTS;
+            budgets = data.budgets || DEFAULT_BUDGETS;
+            goals = data.goals || DEFAULT_GOALS;
+            recurring = data.recurring || DEFAULT_RECURRING;
+            saveAllState();
+            renderApp();
+            alert('Full financial state restored successfully!');
+          }
+        } catch (err) {
+          alert('Invalid backup file format.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function renderApp() {
+      populateDropdowns();
+      renderSummaryMetrics();
+      renderAccountBalances();
+      renderBudgets();
+      renderSavingsGoals();
+      renderRecurring();
+      renderCategoryPills();
+      renderTable();
+      renderCharts();
+      renderInsights();
+      updateBulkActionBar();
+    }
+
+    // App Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      checkPinLock();
+      const txDateInput = document.getElementById('txDate');
+      if (txDateInput) txDateInput.value = new Date().toISOString().split('T')[0];
+      const currSelect = document.getElementById('currencySelect');
+      if (currSelect) currSelect.value = currentCurrency;
+      renderApp();
+      initNetworkAndPWA();
+    });
+
+    let deferredPrompt = null;
+
+    function initNetworkAndPWA() {
+      function updateOnlineStatus() {
+        const badge = document.getElementById('connectionStatusBadge');
+        const text = document.getElementById('connectionStatusText');
+        if (badge && text) {
+          if (navigator.onLine) {
+            badge.className = "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400";
+            text.innerText = "Online";
+          } else {
+            badge.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400";
+            text.innerText = "Offline Mode";
+          }
+        }
+      }
+
+      window.addEventListener('online', updateOnlineStatus);
+      window.addEventListener('offline', updateOnlineStatus);
+      updateOnlineStatus();
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installBtn = document.getElementById('pwaInstallBtn');
+        if (installBtn) installBtn.classList.remove('hidden');
+      });
+
+      window.addEventListener('appinstalled', () => {
+        const installBtn = document.getElementById('pwaInstallBtn');
+        if (installBtn) installBtn.classList.add('hidden');
+        deferredPrompt = null;
+      });
+    }
+
+    function installPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          deferredPrompt = null;
+          const installBtn = document.getElementById('pwaInstallBtn');
+          if (installBtn) installBtn.classList.add('hidden');
+        });
+      }
+    }
+  </script>
+</body>
+</html>
